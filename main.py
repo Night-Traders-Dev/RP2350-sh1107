@@ -3,8 +3,10 @@ import adafruit_displayio_sh1107
 import board
 import busio
 import displayio
+import gc
 import keypad
 import microcontroller
+import sys
 import terminalio
 import time
 
@@ -54,31 +56,33 @@ def get_cpu_stats():
     cputemp1 = microcontroller.cpus[1].temperature
     return f"CPU Stats\n{cpufreq0}/{cpufreq1} Mhz\n{cputemp0:,.2f}/{cputemp1:,.2f} C"
 
-
+def boot_man():
+    draw_text("Kraken Machine", x=10, y=20)
+    draw_text(f"Heap: {gc.mem_alloc()} bytes", x=10, y=30)
+    draw_text(f"Heap: {gc.mem_free()} bytes", x=10, y=40)
+    sys_platform = sys.platform
+    time.sleep(0.5)
+    update_text(f"Board: {sys_platform}", x=10, y=20)
+    time.sleep(1)
+    
 # Initialize display
 displayio.release_displays()
-
 spi_bus = busio.SPI(OLED_CLK, OLED_DIN)
 display_bus = displayio.FourWire(spi_bus, command=OLED_DC, chip_select=OLED_CS, reset=OLED_RST)
-
-# Create the display object
 display = adafruit_displayio_sh1107.SH1107(display_bus, width=WIDTH, height=HEIGHT)
-
-# Create a group to hold the display elements
 splash = displayio.Group()
 display.root_group = splash
-
 draw_bg()
-draw_text("Kraken Machine", x=10, y=20)
+
 
 last_update_time = time.monotonic()
 keys = keypad.Keys((OLED_KEY0, OLED_KEY1), value_when_pressed=False, pull=True)
 reboot_message_active = False
 
+boot_man()
 while True:
     time.sleep(0.1)
-
-    # Handle key events
+    gc.collect()
     event = keys.events.get()
     if event:
         if event.pressed:
