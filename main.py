@@ -6,6 +6,7 @@ import displayio
 import gc
 import keypad
 import microcontroller
+#import platform
 import sys
 import terminalio
 import time
@@ -54,7 +55,16 @@ def get_cpu_stats():
     cpufreq1 = microcontroller.cpus[1].frequency / 1_000_000
     cputemp0 = microcontroller.cpus[0].temperature
     cputemp1 = microcontroller.cpus[1].temperature
-    return f"CPU Stats\n{cpufreq0}/{cpufreq1} Mhz\n{cputemp0:,.2f}/{cputemp1:,.2f} C"
+    sys_platform = sys.platform
+    return f"{sys_platform} Stats\n{cpufreq0}/{cpufreq1} Mhz\n{cputemp0:,.2f}/{cputemp1:,.2f} C"
+
+
+def get_uptime():
+    uptime_seconds = time.monotonic()
+    minutes, seconds = divmod(int(uptime_seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"Uptime\n{hours:02}:{minutes:02}:{seconds:02}"
+
 
 def boot_man():
     draw_text("Kraken Machine", x=10, y=20)
@@ -76,13 +86,16 @@ draw_bg()
 
 
 last_update_time = time.monotonic()
+last_toggle_time = time.monotonic() 
 keys = keypad.Keys((OLED_KEY0, OLED_KEY1), value_when_pressed=False, pull=True)
 reboot_message_active = False
+toggle_display = True
 
 boot_man()
 while True:
     time.sleep(0.1)
     gc.collect()
+    # Handle key events
     event = keys.events.get()
     if event:
         if event.pressed:
@@ -99,7 +112,18 @@ while True:
                 time.sleep(0.1)
 
     current_time = time.monotonic()
+
+    # Toggle display mode every 5 seconds
+    if current_time - last_toggle_time >= 5 and not reboot_message_active:
+        toggle_display = not toggle_display  # Switch between CPU stats and uptime
+        last_toggle_time = current_time
+
+    # Update display content every second
     if current_time - last_update_time >= 1 and not reboot_message_active:
-        cpudata = get_cpu_stats()
-        update_text(f"{cpudata}", x=10, y=20)
+        if toggle_display:
+            cpudata = get_cpu_stats()
+            update_text(f"{cpudata}", x=10, y=20)
+        else:
+            uptime = get_uptime()
+            update_text(f"{uptime}", x=40, y=20)
         last_update_time = current_time
