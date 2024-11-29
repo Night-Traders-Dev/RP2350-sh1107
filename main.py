@@ -6,7 +6,6 @@ import displayio
 import gc
 import keypad
 import microcontroller
-#import platform
 import sys
 import terminalio
 import time
@@ -49,21 +48,32 @@ def update_text(new_text, x, y):
     new_text_area.y = y
     splash.append(new_text_area)
 
+def draw_status_bar(status_text):
+    while len(splash) > 1:
+        splash.pop(0)
+    status_bg = displayio.Bitmap(WIDTH, 12, 1)
+    status_palette = displayio.Palette(1)
+    status_palette[0] = wht_hex
+    status_bg_sprite = displayio.TileGrid(status_bg, pixel_shader=status_palette, x=0, y=0)
+    splash.insert(0, status_bg_sprite)
+    status_text_area = label.Label(terminalio.FONT, text=status_text, color=blk_hex, scale=1)
+    status_text_area.x = 2  # Padding from the left
+    status_text_area.y = 4  # Padding from the top
+    splash.insert(1, status_text_area)
 
 def get_cpu_stats():
     cpufreq0 = microcontroller.cpus[0].frequency / 1_000_000
     cpufreq1 = microcontroller.cpus[1].frequency / 1_000_000
     cputemp0 = microcontroller.cpus[0].temperature
     cputemp1 = microcontroller.cpus[1].temperature
-    sys_platform = sys.platform
-    return f"{sys_platform} Stats\n{cpufreq0}/{cpufreq1} Mhz\n{cputemp0:,.2f}/{cputemp1:,.2f} C"
+    return f"{cpufreq0}/{cpufreq1} Mhz\n{cputemp0:,.2f}/{cputemp1:,.2f} C"
 
 
 def get_uptime():
     uptime_seconds = time.monotonic()
     minutes, seconds = divmod(int(uptime_seconds), 60)
     hours, minutes = divmod(minutes, 60)
-    return f"Uptime\n{hours:02}:{minutes:02}:{seconds:02}"
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
 def boot_man():
@@ -122,8 +132,11 @@ while True:
     if current_time - last_update_time >= 1 and not reboot_message_active:
         if toggle_display:
             cpudata = get_cpu_stats()
-            update_text(f"{cpudata}", x=10, y=20)
+            update_text(f"{cpudata}", x=20, y=25)
+            sys_platform = sys.platform
+            draw_status_bar(f"Mode: {sys_platform} Stats")
         else:
             uptime = get_uptime()
-            update_text(f"{uptime}", x=40, y=20)
+            update_text(f"{uptime}", x=40, y=25)
+            draw_status_bar("Mode: Uptime Stats")
         last_update_time = current_time
