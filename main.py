@@ -28,17 +28,17 @@ wht_hex = 0xFFFFFF
 def rotate_display(rotation):
     """Rotate the display to 0, 90, 180, or 270 degrees."""
     if rotation == 0:
-        send_command(0x80, 0xA0)  # Default segment remap
-        send_command(0x80, 0xC0)  # Default COM scan direction
+        send_command(0xA0)  # Default segment remap
+        send_command(0xC0)  # Default COM scan direction
     elif rotation == 90:
-        send_command(0x80, 0xA1)  # Horizontal flip
-        send_command(0x80, 0xC0)  # Default COM scan direction
+        send_command(0xA1)  # Horizontal flip
+        send_command(0xC0)  # Default COM scan direction
     elif rotation == 180:
-        send_command(0x80, 0xA0)  # Default segment remap
-        send_command(0x80, 0xC8)  # Vertical flip
+        send_command(0xA0)  # Default segment remap
+        send_command(0xC8)  # Vertical flip
     elif rotation == 270:
-        send_command(0x80, 0xA1)  # Horizontal flip
-        send_command(0x80, 0xC8)  # Vertical flip
+        send_command(0xA1)  # Horizontal flip
+        send_command(0xC8)  # Vertical flip
         
 def invert_display(invert):
     """Invert the display colors."""
@@ -50,8 +50,14 @@ def invert_display(invert):
 # Function to send a command using FourWire.send
 def send_command(command, data=None):
     """Send a command and optional data to the SH1107 display."""
+#    b = bytearray(2)
+#    b[0] = command
+#    b[1] = 0x00
     # Send the command byte
-    display_bus.send(False, bytes([command]))
+    spi_bus.try_lock()
+    spi_bus.configure(baudrate=5000000, phase=0, polarity=0)
+    spi_bus.write(bytearray(command))
+    spi_bus.unlock()
     # Send any data bytes, if provided
     if data:
         display_bus.send(True, bytes(data))
