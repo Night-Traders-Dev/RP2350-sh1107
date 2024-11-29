@@ -25,6 +25,37 @@ blk_hex = 0x000000
 wht_hex = 0xFFFFFF
 
 
+def rotate_display(rotation):
+    """Rotate the display to 0, 90, 180, or 270 degrees."""
+    if rotation == 0:
+        send_command(0x80, 0xA0)  # Default segment remap
+        send_command(0x80, 0xC0)  # Default COM scan direction
+    elif rotation == 90:
+        send_command(0x80, 0xA1)  # Horizontal flip
+        send_command(0x80, 0xC0)  # Default COM scan direction
+    elif rotation == 180:
+        send_command(0x80, 0xA0)  # Default segment remap
+        send_command(0x80, 0xC8)  # Vertical flip
+    elif rotation == 270:
+        send_command(0x80, 0xA1)  # Horizontal flip
+        send_command(0x80, 0xC8)  # Vertical flip
+        
+def invert_display(invert):
+    """Invert the display colors."""
+    if invert:
+        send_command(0xA7)  # Invert display
+    else:
+        send_command(0xA6)  # Normal display
+        
+# Function to send a command using FourWire.send
+def send_command(command, data=None):
+    """Send a command and optional data to the SH1107 display."""
+    # Send the command byte
+    display_bus.send(False, bytes([command]))
+    # Send any data bytes, if provided
+    if data:
+        display_bus.send(True, bytes(data))
+
 def draw_bg():
     color_bitmap = displayio.Bitmap(WIDTH, HEIGHT, 1)
     color_palette = displayio.Palette(1)
@@ -47,6 +78,14 @@ def update_text(new_text, x, y):
     new_text_area.x = x
     new_text_area.y = y
     splash.append(new_text_area)
+
+def draw_separator():
+    separator = displayio.Bitmap(WIDTH, 1, 1)
+    separator_palette = displayio.Palette(1)
+    separator_palette[0] = blk_hex
+    separator_sprite = displayio.TileGrid(separator, pixel_shader=separator_palette, x=0, y=12)
+    splash.insert(1, separator_sprite)
+
 
 def draw_status_bar(status_text):
     while len(splash) > 1:
@@ -94,27 +133,24 @@ splash = displayio.Group()
 display.root_group = splash
 draw_bg()
 
-
 last_update_time = time.monotonic()
 last_toggle_time = time.monotonic() 
 keys = keypad.Keys((OLED_KEY0, OLED_KEY1), value_when_pressed=False, pull=True)
 reboot_message_active = False
 toggle_display = True
+button_hold_start = None
+hold_duration_required = 3
 
 boot_man()
+
 while True:
     time.sleep(0.1)
     gc.collect()
-    # Handle key events
     event = keys.events.get()
     if event:
         if event.pressed:
             if event.key_number == 0:
-                draw_status_bar(f"Kraken Machine")
-                update_text("Rebooting...", x=10, y=20)
-                reboot_message_active = True
-                time.sleep(0.5)
-                microcontroller.reset()
+                button_hold_start = time.monotonic()
             elif event.key_number == 1:
                 if display.is_awake:
                     display.sleep()
@@ -122,22 +158,32 @@ while True:
                     display.wake()
                 time.sleep(0.1)
 
+        elif event.released and event.key_number == 0:
+            if button_hold_start is not None:
+                hold_duration = time.monotonic() - button_hold_start
+                if hold_duration >= hold_duration_required:
+                    update_text("Rebooting...", x=10, y=20)
+                    draw_status_bar(f"Kraken Machine")
+                    time.sleep(0.5)
+                    microcontroller.reset()
+                else:
+                    toggle_display = not toggle_display
+                    button_hold_start = None
+
     current_time = time.monotonic()
 
-    # Toggle display mode every 5 seconds
     if current_time - last_toggle_time >= 5 and not reboot_message_active:
-        toggle_display = not toggle_display  # Switch between CPU stats and uptime
+        toggle_display = not toggle_display
         last_toggle_time = current_time
 
-    # Update display content every second
     if current_time - last_update_time >= 1 and not reboot_message_active:
         if toggle_display:
             cpudata = get_cpu_stats()
             update_text(f"{cpudata}", x=20, y=25)
             sys_platform = sys.platform
-            draw_status_bar(f"Mode: {sys_platform} Stats")
+            draw_status_bar(f"{sys_platform} Stats")
         else:
             uptime = get_uptime()
             update_text(f"{uptime}", x=40, y=25)
-            draw_status_bar("Mode: Uptime Stats")
+            draw_status_bar("Uptime Stats")
         last_update_time = current_time
