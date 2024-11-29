@@ -110,6 +110,7 @@ while True:
     if event:
         if event.pressed:
             if event.key_number == 0:
+                draw_status_bar(f"Kraken Machine")
                 update_text("Rebooting...", x=10, y=20)
                 reboot_message_active = True
                 time.sleep(0.5)
