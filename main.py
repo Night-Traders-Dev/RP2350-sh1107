@@ -2,6 +2,7 @@ from adafruit_display_text import bitmap_label as label
 import adafruit_displayio_sh1107
 import board
 import busio
+import digitalio
 import displayio
 import gc
 import keypad
@@ -54,9 +55,14 @@ def send_command(command, data=None):
 #    b[0] = command
 #    b[1] = 0x00
     # Send the command byte
+    cs = digitalio.DigitalInOut(board.GP9)
+    cs.direction = digitalio.Direction.OUTPUT
+    cs.value = True
     spi_bus.try_lock()
     spi_bus.configure(baudrate=5000000, phase=0, polarity=0)
+    cs.value = False
     spi_bus.write(bytearray(command))
+    cs.value = True
     spi_bus.unlock()
     # Send any data bytes, if provided
     if data:
@@ -120,6 +126,13 @@ def get_uptime():
     hours, minutes = divmod(minutes, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
+def get_ram_stats():
+    """Get RAM usage stats."""
+    used = gc.mem_alloc()
+    free = gc.mem_free()
+    total = used + free
+    return f"Used: {used} bytes\nFree: {free} bytes\nTotal: {total} bytes"
+
 
 def boot_man():
     draw_text("Kraken Machine", x=10, y=20)
@@ -149,6 +162,10 @@ hold_duration_required = 3
 
 boot_man()
 
+# Initialize the current page state
+current_page = 0  # 0: CPU Stats, 1: Uptime, 2: RAM Stats
+pages = [f"{sys.platform} Stats", "Uptime Stats", "RAM Stats"]
+
 while True:
     time.sleep(0.1)
     gc.collect()
@@ -173,23 +190,28 @@ while True:
                     time.sleep(0.5)
                     microcontroller.reset()
                 else:
-                    toggle_display = not toggle_display
+                    current_page = (current_page + 1) % len(pages)  # Cycle to next page
                     button_hold_start = None
 
     current_time = time.monotonic()
 
-    if current_time - last_toggle_time >= 5 and not reboot_message_active:
-        toggle_display = not toggle_display
+    # Automatically cycle pages every 5 seconds
+    if current_time - last_toggle_time >= 5:
+        current_page = (current_page + 1) % len(pages)  # Cycle to next page
         last_toggle_time = current_time
 
+    # Update display content every second
     if current_time - last_update_time >= 1 and not reboot_message_active:
-        if toggle_display:
+        if pages[current_page] == f"{sys.platform} Stats":
             cpudata = get_cpu_stats()
             update_text(f"{cpudata}", x=20, y=25)
-            sys_platform = sys.platform
-            draw_status_bar(f"{sys_platform} Stats")
-        else:
+            draw_status_bar(f"{sys.platform} Stats")
+        elif pages[current_page] == "Uptime Stats":
             uptime = get_uptime()
             update_text(f"{uptime}", x=40, y=25)
             draw_status_bar("Uptime Stats")
+        elif pages[current_page] == "RAM Stats":
+            ramdata = get_ram_stats()
+            update_text(f"{ramdata}", x=10, y=25)
+            draw_status_bar("RAM Stats")
         last_update_time = current_time
