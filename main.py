@@ -131,13 +131,13 @@ def get_ram_stats():
     used = gc.mem_alloc()
     free = gc.mem_free()
     total = used + free
-    return f"Used: {used} bytes\nFree: {free} bytes\nTotal: {total} bytes"
+    return f"Used: {used:,} bytes\nFree: {free:,} bytes\nTotal: {total:,} bytes"
 
 
 def boot_man():
     draw_text("Kraken Machine", x=10, y=20)
-    draw_text(f"Heap: {gc.mem_alloc()} bytes", x=10, y=30)
-    draw_text(f"Heap: {gc.mem_free()} bytes", x=10, y=40)
+    draw_text(f"Alloc: {gc.mem_alloc():,} bytes", x=10, y=30)
+    draw_text(f"Free: {gc.mem_free():,} bytes", x=10, y=40)
     sys_platform = sys.platform
     time.sleep(0.5)
     update_text(f"Board: {sys_platform}", x=10, y=20)
